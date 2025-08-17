@@ -191,6 +191,3 @@ def get_stats():
     final_output = final_stats[final_columns]
     
     return jsonify(final_output.to_dict('records'))
-
-if __name__ == '__main__':
-    app.run(debug=True)
