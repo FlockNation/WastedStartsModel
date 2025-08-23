@@ -3,65 +3,74 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MLB Wasted Starts Analyzer</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <title>MLB Pitcher Stats</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
     <div class="container">
-        <h1>Pitcher Wasted Starts Analysis</h1>
-        <p>Analyze starting pitchers who had great outings but received no-decisions or losses.</p>
-
-        <div class="controls">
-            <div class="control-group">
-                <label for="league-select">Select League:</label>
-                <select id="league-select">
-                    <option value="mlb">MLB</option>
-                    <option value="triple-a">Triple-A</option>
-                    <option value="double-a">Double-A</option>
-                    <option value="high-a">High-A</option>
-                    <option value="low-a">Low-A</option>
-                </select>
+        <div class="header">
+            <h1 style="margin-bottom: 20px; color: #333;">MLB Pitcher Statistics</h1>
+            <div class="controls">
+                <div class="control-group">
+                    <label>Year</label>
+                    <div class="slider-container">
+                        <input type="range" id="yearSlider" class="slider" min="2020" max="2024" value="2024">
+                        <span id="yearValue" class="value-display">2024</span>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label>Minimum Starts</label>
+                    <div class="slider-container">
+                        <input type="range" id="minStartsSlider" class="slider" min="5" max="10" value="5">
+                        <span id="minStartsValue" class="value-display">5</span>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label>League</label>
+                    <select id="leagueSelect">
+                        <option value="mlb">MLB</option>
+                        <option value="triple-a">Triple-A</option>
+                        <option value="double-a">Double-A</option>
+                        <option value="high-a">High-A</option>
+                        <option value="low-a">Low-A</option>
+                    </select>
+                </div>
+                <button id="fetchBtn" class="fetch-btn">Get Stats</button>
             </div>
-            <div class="control-group">
-                <label for="year-select">Select Year:</label>
-                <select id="year-select">
-                    <option value="2025">2025</option>
-                    <option value="2024">2024</option>
-                    <option value="2023">2023</option>
-                </select>
-            </div>
-            <div class="control-group">
-                <label for="min-starts-slider">Minimum Starts: <span id="min-starts-value">5</span></label>
-                <input type="range" id="min-starts-slider" min="5" max="10" value="5">
-            </div>
-            <button id="fetch-button">Get Stats</button>
         </div>
 
-        <div id="status-message"></div>
-        <div id="results-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>Team</th>
-                        <th>GS</th>
-                        <th>W</th>
-                        <th>L</th>
-                        <th>ERA</th>
-                        <th>IP</th>
-                        <th>SO</th>
-                        <th>BB</th>
-                        <th>WHIP</th>
-                        <th>QS</th>
-                        <th>Wasted</th>
-                        <th>Example</th>
-                    </tr>
-                </thead>
-                <tbody id="stats-table-body">
-                </tbody>
-            </table>
+        <div id="loading" class="loading" style="display: none;">
+            <p>Loading pitcher statistics...</p>
+        </div>
+
+        <div id="error" class="error" style="display: none;"></div>
+
+        <div id="statsContainer" class="stats-container" style="display: none;">
+            <div class="table-wrapper">
+                <table id="statsTable">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Team</th>
+                            <th>GS</th>
+                            <th>W</th>
+                            <th>L</th>
+                            <th>ERA</th>
+                            <th>IP</th>
+                            <th>SO</th>
+                            <th>BB</th>
+                            <th>WHIP</th>
+                            <th>QS</th>
+                            <th>Wasted</th>
+                            <th>Example</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
         </div>
     </div>
-    <script src="{{ url_for('static', filename='script.js') }}"></script>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 </body>
 </html>
