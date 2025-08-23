@@ -1,12 +1,7 @@
-from flask import Flask, request, jsonify, render_template
+import streamlit as st
 import pandas as pd
 import requests
 import time
-import numpy as np
-import logging
-import os
-
-app = Flask(__name__)
 
 SPORT_IDS = {
     'mlb': 1,
@@ -16,23 +11,20 @@ SPORT_IDS = {
     'low-a': 14
 }
 
+@st.cache_data
 def get_game_by_game(year, league):
-    print(f"Fetching {year} {league} regular season games...")
     sport_id = SPORT_IDS.get(league.lower(), 1)
     if year == 2025:
-        start_date = "2025-03-27"
-        end_date = "2025-09-29"
+        start_date, end_date = "2025-03-27", "2025-09-29"
     elif year == 2024:
-        start_date = "2024-03-28"
-        end_date = "2024-09-29"
+        start_date, end_date = "2024-03-28", "2024-09-29"
     elif year == 2023:
-        start_date = "2023-03-30"
-        end_date = "2023-10-01"
+        start_date, end_date = "2023-03-30", "2023-10-01"
     else:
         return None
 
     url = f"https://statsapi.mlb.com/api/v1/schedule?sportId={sport_id}&startDate={start_date}&endDate={end_date}&gameType=R"
-
+    
     try:
         response = requests.get(url, timeout=60)
         response.raise_for_status()
@@ -99,16 +91,11 @@ def get_game_by_game(year, league):
                             'wasted_start': wasted_start
                         })
                     time.sleep(0.02)
-                except requests.exceptions.RequestException as e:
-                    print(f"Error fetching boxscore for game {game_pk}: {e}")
+                except:
                     continue
 
-        if not all_pitcher_starts:
-            return None
-        return pd.DataFrame(all_pitcher_starts)
-
-    except requests.exceptions.RequestException as e:
-        print(f"Failed to get game data: {e}")
+        return pd.DataFrame(all_pitcher_starts) if all_pitcher_starts else None
+    except:
         return None
 
 def aggregate_pitcher_season_stats(games_df, min_starts):
@@ -135,45 +122,32 @@ def aggregate_pitcher_season_stats(games_df, min_starts):
     season_stats['ERA'] = (season_stats['ER'] / season_stats['IP'] * 9).round(2)
     season_stats['WHIP'] = ((season_stats['H'] + season_stats['BB']) / season_stats['IP']).round(2)
     season_stats = season_stats[season_stats['GS'] >= min_starts]
-    return season_stats
+    return season_stats.sort_values('Wasted_Starts', ascending=False)
 
-def get_wasted_start_examples(games_df, season_stats):
-    examples = {}
-    for _, pitcher in season_stats.iterrows():
-        pitcher_name = pitcher['Name']
-        pitcher_games = games_df[(games_df['pitcher_name'] == pitcher_name) & (games_df['wasted_start'] == True)].sort_values('game_date')
-        if not pitcher_games.empty:
-            first_wasted = pitcher_games.iloc[0]
-            decision_text = first_wasted['decision'] if first_wasted['decision'] else 'ND'
-            examples[pitcher_name] = f"{first_wasted['game_date']} (IP:{first_wasted['ip']}, ER:{first_wasted['er']}, Dec:{decision_text})"
+st.set_page_config(page_title="MLB Pitcher Stats", layout="wide")
+st.title("MLB Pitcher Statistics")
+
+col1, col2, col3 = st.columns(3)
+with col1:
+    year = st.slider("Year", 2020, 2024, 2024)
+with col2:
+    min_starts = st.slider("Minimum Starts", 5, 10, 5)
+with col3:
+    league = st.selectbox("League", ['mlb', 'triple-a', 'double-a', 'high-a', 'low-a'])
+
+if st.button("Get Stats", type="primary"):
+    with st.spinner("Loading pitcher statistics..."):
+        games_df = get_game_by_game(year, league)
+        
+        if games_df is None or games_df.empty:
+            st.error("No data available for the selected year and league")
         else:
-            examples[pitcher_name] = "No wasted starts"
-    season_stats['Wasted_Start_Example'] = season_stats['Name'].map(examples)
-    return season_stats
-
-@app.route('/')
-def home():
-    return render_template('index.html')
-
-@app.route('/api/stats', methods=['GET'])
-def get_stats():
-    year = int(request.args.get('year'))
-    league = request.args.get('league')
-    min_starts = int(request.args.get('min_starts'))
-    games_df = get_game_by_game(year, league)
-    if games_df is None or games_df.empty:
-        return jsonify({'error': 'No data available for the selected year and league'}), 404
-    season_stats = aggregate_pitcher_season_stats(games_df, min_starts)
-    final_stats = get_wasted_start_examples(games_df, season_stats)
-    final_stats = final_stats.sort_values('Wasted_Starts', ascending=False)
-    final_columns = [
-        'Name', 'Team', 'GS', 'W', 'L', 'ERA', 'IP', 'SO', 'BB', 'WHIP',
-        'Quality_Starts', 'Wasted_Starts', 'Wasted_Start_Example'
-    ]
-    final_output = final_stats[final_columns]
-    return jsonify(final_output.to_dict('records'))
-
-if __name__ == '__main__':
-    logging.basicConfig(level=logging.ERROR)
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+            season_stats = aggregate_pitcher_season_stats(games_df, min_starts)
+            
+            if season_stats.empty:
+                st.warning(f"No pitchers found with at least {min_starts} starts")
+            else:
+                st.success(f"Found {len(season_stats)} pitchers")
+                
+                final_columns = ['Name', 'Team', 'GS', 'W', 'L', 'ERA', 'IP', 'SO', 'BB', 'WHIP', 'Quality_Starts', 'Wasted_Starts']
+                st.dataframe(season_stats[final_columns], use_container_width=True)
