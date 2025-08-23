@@ -78,6 +78,10 @@ def get_game_by_game(year, league):
                             continue
                         quality_start = (ip >= 6.0) and (er <= 3)
                         wasted_start = quality_start and (decision != 'W')
+                        
+                        # Debug: print some examples
+                        if quality_start:
+                            print(f"QS: {pitcher_name} - IP:{ip}, ER:{er}, Decision:{decision}, Wasted:{wasted_start}")
                         all_pitcher_starts.append({
                             'pitcher_name': pitcher_name,
                             'team': team_name,
@@ -112,11 +116,9 @@ def aggregate_pitcher_season_stats(games_df, min_starts):
         Wasted_Starts=('wasted_start', 'sum')
     ).reset_index()
 
-    win_loss_stats = games_df.groupby(['pitcher_name', 'team']).apply(
-        lambda x: pd.Series({
-            'W': (x['decision'] == 'W').sum(),
-            'L': (x['decision'] == 'L').sum()
-        })
+    win_loss_stats = games_df.groupby(['pitcher_name', 'team']).agg(
+        W=('decision', lambda x: (x == 'W').sum()),
+        L=('decision', lambda x: (x == 'L').sum())
     ).reset_index()
 
     season_stats = season_stats.merge(win_loss_stats, on=['pitcher_name', 'team'], how='left')
@@ -159,7 +161,11 @@ if st.sidebar.button("Load Data", type="primary"):
         
         st.session_state.games_df = games_df
         st.session_state.season_stats = season_stats
+        # Debug info
+        total_qs = games_df['quality_start'].sum()
+        total_wasted = games_df['wasted_start'].sum()
         st.success(f"Loaded {len(season_stats)} pitchers with {len(games_df)} total starts")
+        st.info(f"Debug: {total_qs} quality starts, {total_wasted} wasted starts ({total_wasted/total_qs*100:.1f}% wasted)" if total_qs > 0 else "No quality starts found")
 
 # Main content
 if 'season_stats' not in st.session_state:
@@ -344,5 +350,7 @@ elif analysis_type == "Player Lookup":
         st.dataframe(comparison_df, use_container_width=True)
 
 # Footer
+st.markdown("---")
+st.markdown("*Tracking quality starts that didn't result in wins | Data from MLB Stats API*")
 st.markdown("---")
 st.markdown("*Tracking quality starts that didn't result in wins | Data from MLB Stats API*")
