@@ -3,25 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MLB Pitcher Stats</title>
+    <title>MLB Wasted Starts Tracker</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1 style="margin-bottom: 20px; color: #333;">MLB Pitcher Statistics</h1>
+            <h1>MLB Wasted Starts Tracker</h1>
+            <p class="subtitle">Tracking quality starts that didn't result in wins</p>
             <div class="controls">
                 <div class="control-group">
-                    <label>Year</label>
-                    <div class="slider-container">
-                        <input type="range" id="yearSlider" class="slider" min="2020" max="2024" value="2024">
-                        <span id="yearValue" class="value-display">2024</span>
-                    </div>
+                    <label>Season</label>
+                    <select id="yearSelect">
+                        <option value="2025">2025</option>
+                        <option value="2024" selected>2024</option>
+                        <option value="2023">2023</option>
+                    </select>
                 </div>
                 <div class="control-group">
                     <label>Minimum Starts</label>
                     <div class="slider-container">
-                        <input type="range" id="minStartsSlider" class="slider" min="5" max="10" value="5">
+                        <input type="range" id="minStartsSlider" class="slider" min="1" max="15" value="5">
                         <span id="minStartsValue" class="value-display">5</span>
                     </div>
                 </div>
@@ -35,41 +37,63 @@
                         <option value="low-a">Low-A</option>
                     </select>
                 </div>
-                <button id="fetchBtn" class="fetch-btn">Get Stats</button>
+                <button id="fetchBtn" class="fetch-btn">Load Wasted Starts</button>
             </div>
         </div>
 
         <div id="loading" class="loading" style="display: none;">
-            <p>Loading pitcher statistics...</p>
+            <p>Loading wasted starts data...</p>
         </div>
 
         <div id="error" class="error" style="display: none;"></div>
 
         <div id="statsContainer" class="stats-container" style="display: none;">
-            <div class="table-wrapper">
-                <table id="statsTable">
-                    <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>Team</th>
-                            <th>GS</th>
-                            <th>W</th>
-                            <th>L</th>
-                            <th>ERA</th>
-                            <th>IP</th>
-                            <th>SO</th>
-                            <th>BB</th>
-                            <th>WHIP</th>
-                            <th>QS</th>
-                            <th>Wasted</th>
-                            <th>Example</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
+            <div class="summary-cards">
+                <div class="card">
+                    <h3 id="totalQS">0</h3>
+                    <p>Quality Starts</p>
+                </div>
+                <div class="card wasted">
+                    <h3 id="totalWasted">0</h3>
+                    <p>Wasted Starts</p>
+                </div>
+                <div class="card">
+                    <h3 id="wastedRate">0%</h3>
+                    <p>Wasted Rate</p>
+                </div>
+                <div class="card">
+                    <h3 id="pitchersWithWasted">0</h3>
+                    <p>Pitchers Affected</p>
+                </div>
+            </div>
+
+            <div class="table-section">
+                <h2>Wasted Starts Leaderboard</h2>
+                <div class="table-wrapper">
+                    <table id="statsTable">
+                        <thead>
+                            <tr>
+                                <th>Rank</th>
+                                <th>Name</th>
+                                <th>Team</th>
+                                <th>Quality Starts</th>
+                                <th class="wasted-col">Wasted Starts</th>
+                                <th class="wasted-col">Wasted %</th>
+                                <th>Wins</th>
+                                <th>Losses</th>
+                                <th>ERA</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
+
+    <footer>
+        <p>Tracking quality starts that didn't result in wins | Data from MLB Stats API</p>
+    </footer>
 
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 </body>
