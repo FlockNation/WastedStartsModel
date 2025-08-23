@@ -130,8 +130,8 @@ def aggregate_pitcher_season_stats(games_df, min_starts):
 
 st.set_page_config(page_title="MLB Pitcher Analytics", layout="wide")
 
-st.title("MLB Pitcher Analytics Dashboard")
-st.markdown("*Advanced pitcher statistics and quality start analysis*")
+st.title("MLB Wasted Starts Tracker")
+st.markdown("*Analyzing quality starts that didn't result in wins*")
 
 # Sidebar controls
 st.sidebar.header("Controls")
@@ -141,7 +141,7 @@ min_starts = st.sidebar.slider("Minimum Starts", 1, 15, 5)
 
 # Analysis type
 analysis_type = st.sidebar.radio("Analysis Type", 
-    ["Season Stats", "Leaderboards", "Visualizations", "Player Search"])
+    ["Wasted Starts Overview", "Worst Offenders", "Wasted Start Charts", "Player Lookup"])
 
 if st.sidebar.button("Load Data", type="primary"):
     with st.spinner(f"Loading {year} {league.upper()} data..."):
@@ -169,55 +169,60 @@ if 'season_stats' not in st.session_state:
 games_df = st.session_state.games_df
 season_stats = st.session_state.season_stats
 
-if analysis_type == "Season Stats":
-    st.header("Season Statistics")
+if analysis_type == "Wasted Starts Overview":
+    st.header("Wasted Starts Analysis")
     
-    # Key metrics
+    # Key metrics focused on wasted starts
+    total_qs = games_df['quality_start'].sum()
+    total_wasted = games_df['wasted_start'].sum()
+    wasted_rate = (total_wasted / total_qs * 100) if total_qs > 0 else 0
+    
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("Total Pitchers", len(season_stats))
+        st.metric("Total Quality Starts", total_qs)
     with col2:
-        st.metric("Total Starts", len(games_df))
+        st.metric("Total Wasted Starts", total_wasted)
     with col3:
-        st.metric("Quality Starts", games_df['quality_start'].sum())
+        st.metric("League Wasted Rate", f"{wasted_rate:.1f}%")
     with col4:
-        st.metric("Wasted Starts", games_df['wasted_start'].sum())
+        st.metric("Pitchers with Wasted Starts", len(season_stats[season_stats['Wasted_Starts'] > 0]))
     
-    # Full stats table
-    st.subheader("Complete Statistics")
-    display_cols = ['Name', 'Team', 'GS', 'W', 'L', 'ERA', 'WHIP', 'IP', 'SO', 'Quality_Starts', 'QS%', 'Wasted_Starts', 'Wasted%']
-    st.dataframe(season_stats[display_cols].sort_values('Wasted_Starts', ascending=False), 
+    # Wasted starts focused table
+    st.subheader("Wasted Starts Leaderboard")
+    wasted_cols = ['Name', 'Team', 'Quality_Starts', 'Wasted_Starts', 'Wasted%', 'GS', 'W', 'L']
+    st.dataframe(season_stats[wasted_cols].sort_values('Wasted_Starts', ascending=False), 
                 use_container_width=True, height=400)
 
-elif analysis_type == "Leaderboards":
-    st.header("Leaderboards")
+elif analysis_type == "Worst Offenders":
+    st.header("Wasted Starts Hall of Shame")
     
-    tab1, tab2, tab3, tab4 = st.tabs(["Most Wasted", "Best QS%", "Lowest ERA", "Most Strikeouts"])
+    tab1, tab2, tab3, tab4 = st.tabs(["Most Wasted Total", "Highest Wasted %", "Most QS Without Wins", "Unluckiest Pitchers"])
     
     with tab1:
-        st.subheader("Most Wasted Quality Starts")
-        top_wasted = season_stats.nlargest(10, 'Wasted_Starts')[['Name', 'Team', 'Quality_Starts', 'Wasted_Starts', 'Wasted%']]
+        st.subheader("Most Total Wasted Starts")
+        top_wasted = season_stats.nlargest(15, 'Wasted_Starts')[['Name', 'Team', 'Quality_Starts', 'Wasted_Starts', 'Wasted%', 'ERA']]
         st.dataframe(top_wasted, use_container_width=True)
     
     with tab2:
-        st.subheader("Highest Quality Start Percentage")
-        top_qs = season_stats.nlargest(10, 'QS%')[['Name', 'Team', 'GS', 'Quality_Starts', 'QS%']]
-        st.dataframe(top_qs, use_container_width=True)
+        st.subheader("Highest Wasted Start Percentage (min 5 QS)")
+        qualified = season_stats[season_stats['Quality_Starts'] >= 5]
+        top_wasted_pct = qualified.nlargest(15, 'Wasted%')[['Name', 'Team', 'Quality_Starts', 'Wasted_Starts', 'Wasted%']]
+        st.dataframe(top_wasted_pct, use_container_width=True)
     
     with tab3:
-        st.subheader("Lowest ERA (min 10 GS)")
-        low_era = season_stats[season_stats['GS'] >= 10].nsmallest(10, 'ERA')[['Name', 'Team', 'GS', 'ERA', 'WHIP']]
-        st.dataframe(low_era, use_container_width=True)
+        st.subheader("Most Quality Starts Without Wins")
+        most_qs_wasted = season_stats[season_stats['Wasted_Starts'] > 0].nlargest(15, 'Quality_Starts')[['Name', 'Team', 'Quality_Starts', 'Wasted_Starts', 'W', 'L']]
+        st.dataframe(most_qs_wasted, use_container_width=True)
     
     with tab4:
-        st.subheader("Most Strikeouts")
-        top_so = season_stats.nlargest(10, 'SO')[['Name', 'Team', 'GS', 'SO', 'IP']]
-        st.dataframe(top_so, use_container_width=True)
+        st.subheader("Best ERA with Most Wasted Starts")
+        unlucky = season_stats[season_stats['Wasted_Starts'] >= 3].nsmallest(10, 'ERA')[['Name', 'Team', 'ERA', 'Quality_Starts', 'Wasted_Starts', 'Wasted%']]
+        st.dataframe(unlucky, use_container_width=True)
 
-elif analysis_type == "Visualizations":
-    st.header("Data Visualizations")
+elif analysis_type == "Wasted Start Charts":
+    st.header("Wasted Starts Visualizations")
     
-    tab1, tab2, tab3 = st.tabs(["Scatter Plots", "Distributions", "Team Analysis"])
+    tab1, tab2, tab3 = st.tabs(["Wasted Start Analysis", "Team Comparisons", "Efficiency Metrics"])
     
     with tab1:
         col1, col2 = st.columns(2)
@@ -225,40 +230,51 @@ elif analysis_type == "Visualizations":
         with col1:
             fig1 = px.scatter(season_stats, x='ERA', y='Wasted_Starts', 
                             hover_data=['Name', 'Team'], title='ERA vs Wasted Starts',
-                            color='QS%', size='GS')
+                            color='Wasted%', size='Quality_Starts',
+                            labels={'Wasted_Starts': 'Wasted Starts', 'ERA': 'ERA'})
             st.plotly_chart(fig1, use_container_width=True)
         
         with col2:
             fig2 = px.scatter(season_stats, x='Quality_Starts', y='Wasted_Starts',
                             hover_data=['Name', 'Team'], title='Quality Starts vs Wasted Starts',
-                            color='ERA', size='GS')
+                            color='W', size='GS',
+                            labels={'Quality_Starts': 'Quality Starts', 'Wasted_Starts': 'Wasted Starts'})
             st.plotly_chart(fig2, use_container_width=True)
     
     with tab2:
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            fig3 = px.histogram(season_stats, x='QS%', nbins=20, title='Quality Start % Distribution')
-            st.plotly_chart(fig3, use_container_width=True)
-        
-        with col2:
-            fig4 = px.histogram(season_stats, x='Wasted%', nbins=20, title='Wasted Start % Distribution')
-            st.plotly_chart(fig4, use_container_width=True)
-    
-    with tab3:
         team_stats = season_stats.groupby('Team').agg({
             'Quality_Starts': 'sum',
             'Wasted_Starts': 'sum',
             'GS': 'sum'
         }).reset_index()
-        team_stats['Team_QS%'] = (team_stats['Quality_Starts'] / team_stats['GS'] * 100).round(1)
+        team_stats['Team_Wasted%'] = (team_stats['Wasted_Starts'] / team_stats['Quality_Starts'] * 100).fillna(0).round(1)
         
-        fig5 = px.bar(team_stats.sort_values('Wasted_Starts', ascending=False).head(15), 
-                     x='Team', y='Wasted_Starts', title='Wasted Starts by Team')
-        st.plotly_chart(fig5, use_container_width=True)
+        col1, col2 = st.columns(2)
+        with col1:
+            fig3 = px.bar(team_stats.sort_values('Wasted_Starts', ascending=False).head(15), 
+                         x='Team', y='Wasted_Starts', title='Most Wasted Starts by Team')
+            st.plotly_chart(fig3, use_container_width=True)
+        
+        with col2:
+            fig4 = px.bar(team_stats.sort_values('Team_Wasted%', ascending=False).head(15), 
+                         x='Team', y='Team_Wasted%', title='Highest Wasted Start % by Team')
+            st.plotly_chart(fig4, use_container_width=True)
+    
+    with tab3:
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            fig5 = px.histogram(season_stats[season_stats['Wasted_Starts'] > 0], x='Wasted_Starts', 
+                              nbins=15, title='Distribution of Wasted Starts')
+            st.plotly_chart(fig5, use_container_width=True)
+        
+        with col2:
+            fig6 = px.histogram(season_stats[season_stats['Quality_Starts'] > 0], x='Wasted%', 
+                              nbins=20, title='Distribution of Wasted Start %')
+            st.plotly_chart(fig6, use_container_width=True)
 
-elif analysis_type == "Player Search":
-    st.header("Player Search & Comparison")
+elif analysis_type == "Player Lookup":
+    st.header("Wasted Starts Player Analysis")
     
     # Player search
     search_name = st.text_input("Search for a pitcher:", placeholder="Enter pitcher name...")
@@ -268,32 +284,41 @@ elif analysis_type == "Player Search":
         
         if not matches.empty:
             st.subheader("Search Results")
-            st.dataframe(matches[['Name', 'Team', 'GS', 'W', 'L', 'ERA', 'Quality_Starts', 'Wasted_Starts']], 
+            st.dataframe(matches[['Name', 'Team', 'Quality_Starts', 'Wasted_Starts', 'Wasted%', 'W', 'L', 'ERA']], 
                         use_container_width=True)
             
-            # Individual pitcher analysis
+            # Individual pitcher wasted starts analysis
             if len(matches) == 1:
                 pitcher = matches.iloc[0]
-                st.subheader(f"Detailed Analysis: {pitcher['Name']}")
+                st.subheader(f"Wasted Starts Profile: {pitcher['Name']}")
                 
-                col1, col2, col3 = st.columns(3)
+                col1, col2, col3, col4 = st.columns(4)
                 with col1:
-                    st.metric("Quality Start %", f"{pitcher['QS%']}%")
+                    st.metric("Total Wasted Starts", int(pitcher['Wasted_Starts']))
                 with col2:
                     st.metric("Wasted Start %", f"{pitcher['Wasted%']}%")
                 with col3:
-                    st.metric("ERA Rank", f"#{season_stats[season_stats['ERA'] <= pitcher['ERA']].shape[0]}")
+                    wasted_rank = season_stats[season_stats['Wasted_Starts'] >= pitcher['Wasted_Starts']].shape[0]
+                    st.metric("Wasted Starts Rank", f"#{wasted_rank}")
+                with col4:
+                    efficiency = ((pitcher['Quality_Starts'] - pitcher['Wasted_Starts']) / pitcher['Quality_Starts'] * 100) if pitcher['Quality_Starts'] > 0 else 0
+                    st.metric("QS Efficiency", f"{efficiency:.1f}%")
                 
-                # Game log
+                # Wasted starts game log
                 pitcher_games = games_df[games_df['pitcher_name'] == pitcher['Name']].sort_values('game_date')
-                st.subheader("Game Log")
-                st.dataframe(pitcher_games[['game_date', 'ip', 'er', 'h', 'bb', 'so', 'decision', 'quality_start', 'wasted_start']], 
-                           use_container_width=True)
+                wasted_games = pitcher_games[pitcher_games['wasted_start'] == True]
+                
+                if not wasted_games.empty:
+                    st.subheader("All Wasted Starts")
+                    st.dataframe(wasted_games[['game_date', 'ip', 'er', 'h', 'bb', 'so', 'decision']], 
+                               use_container_width=True)
+                else:
+                    st.info("This pitcher has no wasted starts!")
         else:
             st.warning("No pitchers found matching your search.")
     
-    # Player comparison
-    st.subheader("Player Comparison")
+    # Wasted starts comparison
+    st.subheader("Wasted Starts Comparison")
     col1, col2 = st.columns(2)
     
     with col1:
@@ -306,11 +331,13 @@ elif analysis_type == "Player Search":
         p2_stats = season_stats[season_stats['Name'] == player2].iloc[0]
         
         comparison_data = {
-            'Stat': ['Games Started', 'Wins', 'ERA', 'WHIP', 'Quality Starts', 'Wasted Starts', 'QS%', 'Wasted%'],
-            player1: [p1_stats['GS'], p1_stats['W'], p1_stats['ERA'], p1_stats['WHIP'], 
-                     p1_stats['Quality_Starts'], p1_stats['Wasted_Starts'], p1_stats['QS%'], p1_stats['Wasted%']],
-            player2: [p2_stats['GS'], p2_stats['W'], p2_stats['ERA'], p2_stats['WHIP'], 
-                     p2_stats['Quality_Starts'], p2_stats['Wasted_Starts'], p2_stats['QS%'], p2_stats['Wasted%']]
+            'Stat': ['Quality Starts', 'Wasted Starts', 'Wasted %', 'QS Efficiency', 'Wins', 'Losses', 'ERA'],
+            player1: [int(p1_stats['Quality_Starts']), int(p1_stats['Wasted_Starts']), f"{p1_stats['Wasted%']}%", 
+                     f"{((p1_stats['Quality_Starts'] - p1_stats['Wasted_Starts']) / p1_stats['Quality_Starts'] * 100):.1f}%" if p1_stats['Quality_Starts'] > 0 else "0%",
+                     int(p1_stats['W']), int(p1_stats['L']), p1_stats['ERA']],
+            player2: [int(p2_stats['Quality_Starts']), int(p2_stats['Wasted_Starts']), f"{p2_stats['Wasted%']}%", 
+                     f"{((p2_stats['Quality_Starts'] - p2_stats['Wasted_Starts']) / p2_stats['Quality_Starts'] * 100):.1f}%" if p2_stats['Quality_Starts'] > 0 else "0%",
+                     int(p2_stats['W']), int(p2_stats['L']), p2_stats['ERA']]
         }
         
         comparison_df = pd.DataFrame(comparison_data)
@@ -318,4 +345,4 @@ elif analysis_type == "Player Search":
 
 # Footer
 st.markdown("---")
-st.markdown("*Data sourced from MLB Stats API | Built with Streamlit*")
+st.markdown("*Tracking quality starts that didn't result in wins | Data from MLB Stats API*")
