@@ -45,10 +45,11 @@ def get_game_by_game(year, league):
                     box_response = requests.get(boxscore_url, timeout=15)
                     box_data = box_response.json()
                     teams_data = box_data.get('teams', {})
-                    decisions_data = box_data.get('decisions', {})
-                    winner_id = decisions_data.get('winner', {}).get('id')
-                    loser_id = decisions_data.get('loser', {}).get('id')
-
+                    
+                    # Get game winner
+                    home_score = teams_data.get('home', {}).get('teamStats', {}).get('batting', {}).get('runs', 0)
+                    away_score = teams_data.get('away', {}).get('teamStats', {}).get('batting', {}).get('runs', 0)
+                    
                     for side in ['home', 'away']:
                         team_data = teams_data.get(side, {})
                         pitchers_list = team_data.get('pitchers', [])
@@ -67,21 +68,25 @@ def get_game_by_game(year, league):
                             continue
                         ip = float(pitching_stats.get('inningsPitched', '0.0'))
                         er = int(pitching_stats.get('earnedRuns', 0))
-                        decision = ''
-                        if starter_id == winner_id:
-                            decision = 'W'
-                        elif starter_id == loser_id:
-                            decision = 'L'
-                        else:
-                            decision = 'ND'
+                        
+                        # Determine win/loss based on team performance and starter eligibility
+                        decision = 'ND'
+                        if ip >= 5.0:  # Starter must go 5+ innings to be eligible for win
+                            if side == 'home' and home_score > away_score:
+                                decision = 'W'
+                            elif side == 'away' and away_score > home_score:
+                                decision = 'W'
+                            elif ip >= 5.0:  # Loss eligibility
+                                if side == 'home' and home_score < away_score:
+                                    decision = 'L'
+                                elif side == 'away' and away_score < home_score:
+                                    decision = 'L'
+                        
                         if ip < 4.0:
                             continue
                         quality_start = (ip >= 6.0) and (er <= 3)
                         wasted_start = quality_start and (decision != 'W')
                         
-                        # Debug: print some examples
-                        if quality_start:
-                            print(f"QS: {pitcher_name} - IP:{ip}, ER:{er}, Decision:{decision}, Wasted:{wasted_start}")
                         all_pitcher_starts.append({
                             'pitcher_name': pitcher_name,
                             'team': team_name,
@@ -113,15 +118,11 @@ def aggregate_pitcher_season_stats(games_df, min_starts):
         BB=('bb', 'sum'),
         SO=('so', 'sum'),
         Quality_Starts=('quality_start', 'sum'),
-        Wasted_Starts=('wasted_start', 'sum')
-    ).reset_index()
-
-    win_loss_stats = games_df.groupby(['pitcher_name', 'team']).agg(
+        Wasted_Starts=('wasted_start', 'sum'),
         W=('decision', lambda x: (x == 'W').sum()),
         L=('decision', lambda x: (x == 'L').sum())
     ).reset_index()
 
-    season_stats = season_stats.merge(win_loss_stats, on=['pitcher_name', 'team'], how='left')
     season_stats = season_stats.rename(columns={'pitcher_name': 'Name', 'team': 'Team'})
     season_stats['ERA'] = (season_stats['ER'] / season_stats['IP'] * 9).round(2)
     season_stats['WHIP'] = ((season_stats['H'] + season_stats['BB']) / season_stats['IP']).round(2)
@@ -350,7 +351,5 @@ elif analysis_type == "Player Lookup":
         st.dataframe(comparison_df, use_container_width=True)
 
 # Footer
-st.markdown("---")
-st.markdown("*Tracking quality starts that didn't result in wins | Data from MLB Stats API*")
 st.markdown("---")
 st.markdown("*Tracking quality starts that didn't result in wins | Data from MLB Stats API*")
